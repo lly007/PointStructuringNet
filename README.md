@@ -1,8 +1,9 @@
 # PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud
-### (Anonymous Currently)
+### Luyang Li; Ligang He; Jinjin Gao; Xie Han
 
 This repository is the implementation for our paper :<br>
-*PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud*
+*PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud(https://ieeexplore.ieee.org/document/9766172)<br>
+Published in: *IEEE Transactions on Circuits and Systems for Video Technology*
 
 ## Introduction
 ![Architecture of Point Structuring Net](./image/psn.png "Architecture of Point Structuring Net")<br>
@@ -113,6 +114,19 @@ python test_semseg.py --log_dir [your log dir] --test_area 5 --visual
 ## Experiment Reference
 This implementation of experiment is heavily reference to [yanx27/Pointnet_Pointnet2_pytorch](https://github.com/yanx27/Pointnet_Pointnet2_pytorch)<br>
 Thanks very much !
+
+# Cite This
+```
+@ARTICLE{li-psnet-tcsvt,
+  author={Li, Luyang and He, Ligang and Gao, Jinjin and Han, Xie},
+  journal={IEEE Transactions on Circuits and Systems for Video Technology}, 
+  title={PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud}, 
+  year={2022},
+  volume={},
+  number={},
+  pages={1-1},
+  doi={10.1109/TCSVT.2022.3171968}}
+```
 
 # Reference
 [1] Qi, Charles Ruizhongtai, et al. “[PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space](http://papers.nips.cc/paper/7095-pointnet-deep-hierarchical-feature-learning-on-point-se).” *Advances in Neural Information Processing Systems*, 2017, pp. 5099–5108. [[PDF](http://papers.nips.cc/paper/7095-pointnet-deep-hierarchical-feature-learning-on-point-sets-in-a-metric-space.pdf)]<br>
