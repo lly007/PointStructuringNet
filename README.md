@@ -2,7 +2,7 @@
 ### Luyang Li; Ligang He; Jinjin Gao; Xie Han
 
 This repository is the implementation for our paper :<br>
-*PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud(https://ieeexplore.ieee.org/document/9766172)<br>
+*PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud*(https://ieeexplore.ieee.org/document/9766172)<br>
 Published in: *IEEE Transactions on Circuits and Systems for Video Technology*
 
 ## Introduction
