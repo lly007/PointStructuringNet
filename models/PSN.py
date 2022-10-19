@@ -50,6 +50,7 @@ class PSN(nn.Module):
 
         self.s = num_to_sample
         self.n = max_local_num
+        self.temperature = 1.0
 
     def forward(self, coordinate: Tensor, feature: Tensor, train: bool = False) -> Tuple[Tensor, Tensor]:
         """
@@ -70,9 +71,9 @@ class PSN(nn.Module):
         th = torch.acos(coordinate[:,:,2] / r)
         fi = torch.atan2(coordinate[:,:,1], coordinate[:,:,0])
 
-        coordinate = torch.cat([coordinate, th.unsqueeze_(2), fi.unsqueeze_(2)], -1)
+        coordinate2 = torch.cat([coordinate, th.unsqueeze_(2), fi.unsqueeze_(2)], -1)
 
-        x = coordinate.transpose(2, 1)  # Channel First
+        x = coordinate2.transpose(2, 1)  # Channel First
 
         for i in range(len(self.mlp_convs) - 1):
             x = F.relu(self.mlp_bns[i](self.mlp_convs[i](x)))
@@ -86,16 +87,16 @@ class PSN(nn.Module):
 
         Q = torch.sigmoid(x)  # [B, s, m]
 
-        _, indices = torch.sort(input=Q, dim=2, descending=True)    # [B, s, m]
-        grouped_indices = indices[:,:,:self.n]
-        grouped_points = index_points(coordinate, grouped_indices)[:,:,:self.n,:]  #[B,s,n,3]
+        _, grouped_indices = torch.topk(input=Q, k=self.n, dim=2)    # [B, s, n]
+        grouped_points = index_points(coordinate, grouped_indices)  #[B,s,n,3]
         if feature is not None:
-            grouped_feature = index_points(feature, grouped_indices)[:,:,:self.n,:]  #[B,s,n,d]
+            grouped_feature = index_points(feature, grouped_indices)  #[B,s,n,d]
             if not train:
                 sampled_points = grouped_points[:,:,0,:]  # [B,s,3]
                 sampled_feature = grouped_feature[:,:,0,:]  #[B,s,d]
             else:
-                Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                # Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m]
                 sampled_points = torch.matmul(Q, coordinate)  # [B,s,3]
                 sampled_feature = torch.matmul(Q, feature)  # [B,s,d]
                 grouped_feature[:,:,0,:] = sampled_feature
@@ -104,7 +105,8 @@ class PSN(nn.Module):
                 sampled_points = grouped_points[:,:,0,:]  # [B,s,3]
                 sampled_feature = None  #[B,s,d]
             else:
-                Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                # Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m]
                 sampled_points = torch.matmul(Q, coordinate)  # [B,s,3]
                 sampled_feature = None
             grouped_feature = None
@@ -349,7 +351,7 @@ def gumbel_softmax_sample(logits, dim=-1, temperature=0.001):
     y = logits + sample_gumbel(logits.size())
     return F.softmax(y / temperature, dim=dim)
 
-def gumbel_softmax(logits, temperature=1.0, hard=False):
+def gumbel_softmax(logits, temperature=1.0, hard=True):
     """Sample from the Gumbel-Softmax distribution and optionally discretize.
     Args:
       logits: [batch_size, n_class] unnormalized log-probs

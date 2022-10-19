@@ -175,8 +175,9 @@ class PointNetSetAbstraction(nn.Module):
             new_xyz, new_points = sample_and_group_all(xyz, points)
         else:
             sampled_points, grouped_points, sampled_feature, grouped_feature = self.sampling(xyz,points,train)
+            
             new_xyz, new_points = sample_and_group_psn(
-                self.npoint, sampled_points, grouped_points, sampled_feature, grouped_feature, self.nsample, xyz, points)
+                self.npoint, sampled_points, grouped_points, sampled_feature, grouped_feature, self.nsample)
         # new_xyz: sampled points position data, [B, npoint, C]
         # new_points: sampled points data, [B, npoint, nsample, C+D]
         new_points = new_points.permute(0, 3, 2, 1)  # [B, C+D, nsample,npoint]
