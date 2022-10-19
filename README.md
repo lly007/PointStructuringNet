@@ -25,11 +25,11 @@ conda install pytorch cudatoolkit cudnn -c pytorch
 ```
 
 ## Import Point Structuring Net PyTorch Module
-You may import PSN pytorch module by:
+You may import PSNet pytorch module by:
 ```python
 import PSN as psn
 ```
-## Native PSN
+## Native PSNet
 ### Defining
 ```python
 psn_layer = psn.PSN(num_to_sample = 512, max_local_num = 32, mlp = [32, 256])
@@ -44,7 +44,7 @@ sampled_points, grouped_points, sampled_feature, grouped_feature = psn_layer(coo
 *{coordinates of point cloud}* is a torch.Tensor object, its shape is [*batch size*, *number of points*, *3*]<br>
 *{feature of point cloud}* is a torch.Tensor object, , its shape is [*batch size*, *number of points*, *D*].
 
-## PSN with Multi-Scale Grouping
+## PSNet with Multi-Scale Grouping
 ### Defining
 ```python
 psn_msg_layer = psn.PSNMSG(num_to_sample = 512, msg_n = [32, 64], mlp = [32, 256])
