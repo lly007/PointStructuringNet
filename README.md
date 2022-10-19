@@ -122,9 +122,9 @@ Thanks very much !
   journal={IEEE Transactions on Circuits and Systems for Video Technology}, 
   title={PSNet: Fast Data Structuring for Hierarchical Deep Learning on Point Cloud}, 
   year={2022},
-  volume={},
-  number={},
-  pages={1-1},
+  volume={32},
+  number={10},
+  pages={6835-6849},
   doi={10.1109/TCSVT.2022.3171968}}
 ```
 
