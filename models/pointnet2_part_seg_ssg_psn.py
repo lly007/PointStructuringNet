@@ -44,7 +44,7 @@ class get_model(nn.Module):
         feat =  F.relu(self.bn1(self.conv1(l0_points)))
         x = self.drop1(feat)
         x = self.conv2(x)
-        x = F.log_softmax(x, dim=1)
+        # x = F.log_softmax(x, dim=1)
         x = x.permute(0, 2, 1)
         # diff = diff1 + diff2 + diff3
         return x, l3_points
@@ -53,8 +53,9 @@ class get_model(nn.Module):
 class get_loss(nn.Module):
     def __init__(self):
         super(get_loss, self).__init__()
+        self.cel = nn.CrossEntropyLoss(label_smoothing=0.1)
 
     def forward(self, pred, target, trans_feat):
-        total_loss = F.nll_loss(pred, target)
+        total_loss = self.cel(pred, target)
 
         return total_loss

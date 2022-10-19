@@ -50,7 +50,8 @@ class PSN(nn.Module):
 
         self.s = num_to_sample
         self.n = max_local_num
-        self.temperature = 1.0
+        self.temperature = 0.1
+        self.origin_point =  torch.nn.Parameter(torch.zeros(1,3), requires_grad=False)
 
     def forward(self, coordinate: Tensor, feature: Tensor, train: bool = False) -> Tuple[Tensor, Tensor]:
         """
@@ -67,13 +68,13 @@ class PSN(nn.Module):
 
         assert self.s < m, "The number to sample must less than input points !"
 
-        r = torch.sqrt(torch.pow(coordinate[:,:,0],2)+torch.pow(coordinate[:,:,1],2)+torch.pow(coordinate[:,:,2],2))
+        r = torch.cdist(coordinate,self.origin_point,2).squeeze_()
         th = torch.acos(coordinate[:,:,2] / r)
         fi = torch.atan2(coordinate[:,:,1], coordinate[:,:,0])
 
         coordinate2 = torch.cat([coordinate, th.unsqueeze_(2), fi.unsqueeze_(2)], -1)
 
-        x = coordinate2.transpose(2, 1)  # Channel First
+        x = coordinate2.transpose(2, 1)  # Channel First [B, 5, m]
 
         for i in range(len(self.mlp_convs) - 1):
             x = F.relu(self.mlp_bns[i](self.mlp_convs[i](x)))
@@ -96,7 +97,7 @@ class PSN(nn.Module):
                 sampled_feature = grouped_feature[:,:,0,:]  #[B,s,d]
             else:
                 # Q = gumbel_softmax_sample(Q)  # [B, s, m]
-                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m]
+                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m] Using the Gumbel Softmax function included in PyTorch
                 sampled_points = torch.matmul(Q, coordinate)  # [B,s,3]
                 sampled_feature = torch.matmul(Q, feature)  # [B,s,d]
                 grouped_feature[:,:,0,:] = sampled_feature
@@ -290,8 +291,8 @@ class PSNMSG(nn.Module):
 
         Q = torch.sigmoid(x)  # [B, s, m]
 
-        _, indices = torch.sort(input=Q, dim=2, descending=True)    # [B, s, m]
-        grouped_indices = indices[:,:,:self.n]
+        _, grouped_indices = torch.topk(input=Q, k=self.n, dim=2)    # [B, s, n]
+        # grouped_points = index_points(coordinate, grouped_indices)  #[B,s,n,3]
         grouped_points_msg = []
         for n in self.msg_n:
             grouped_points_msg.append(index_points(coordinate, grouped_indices)[:,:,:n,:])
@@ -340,6 +341,11 @@ def index_points(points, idx):
         device).view(view_shape).repeat(repeat_shape)
     new_points = points[batch_indices, idx, :]
     return new_points
+
+# Gumbel Softmax
+# This version of the code uses Gumbel, which is included in Torch. 
+# If a future version of Torch removes the Gubmel Softmax function, 
+# you can use the following methods instead.
 
 def sample_gumbel(shape, eps=1e-20):
     U = torch.rand(shape)
