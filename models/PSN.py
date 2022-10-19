@@ -6,9 +6,10 @@ from torch import Tensor
 from typing import List, Tuple
 
 
-class PSN(nn.Module):
+class PSNv1(nn.Module):
     """
-    Point Sampling Net PyTorch Module.
+    Point Structuring Net PyTorch Module.
+    PSNet version 1, MLP implemented by 1x1 convolution.
 
     Attributes:
         num_to_sample: the number to sample, int
@@ -19,9 +20,9 @@ class PSN(nn.Module):
 
     def __init__(self, num_to_sample: int = 512, max_local_num: int = 32, mlp: List[int] = [32, 128], global_feature: bool = False) -> None:
         """
-        Initialization of Point Sampling Net.
+        Initialization of Point Structuring Net.
         """
-        super(PSN, self).__init__()
+        super(PSNv1, self).__init__()
 
         self.mlp_convs = nn.ModuleList()
         self.mlp_bns = nn.ModuleList()
@@ -55,7 +56,7 @@ class PSN(nn.Module):
 
     def forward(self, coordinate: Tensor, feature: Tensor, train: bool = False) -> Tuple[Tensor, Tensor]:
         """
-        Forward propagation of Point Sampling Net
+        Forward propagation of Point Structuring Net
 
         Args:
             coordinate: input points position data, [B, m, 3]
@@ -114,9 +115,122 @@ class PSN(nn.Module):
 
         return sampled_points, grouped_points, sampled_feature, grouped_feature
 
+class PSN(nn.Module):
+    """
+    PSNet version 2, MLP implemented by Linear.
+    Version 2 runs slightly faster than version 1, While maintaining their equivalence.
+    Models call version 2 as default.
+    Point Structuring Net PyTorch Module.
+
+    Attributes:
+        num_to_sample: the number to sample, int
+        max_local_num: the max number of local area, int
+        mlp: the channels of feature transform function, List[int]
+        global_geature: whether enable global feature, bool
+    """
+
+    def __init__(self, num_to_sample: int = 512, max_local_num: int = 32, mlp: List[int] = [32, 128], global_feature: bool = False) -> None:
+        """
+        Initialization of Point Structuring Net.
+        """
+        super(PSN, self).__init__()
+
+        self.mlp_convs = nn.ModuleList()
+        self.mlp_bns = nn.ModuleList()
+
+        assert len(mlp) > 1, "The number of MLP layers must greater than 1 !"
+
+        self.mlp_convs.append(
+            nn.Linear(in_features=5, out_features=mlp[0], bias=False))
+        self.mlp_bns.append(nn.BatchNorm1d(num_features=mlp[0]))
+
+        for i in range(len(mlp)-1):
+            self.mlp_convs.append(
+                nn.Linear(in_features=mlp[i], out_features=mlp[i+1], bias=False))
+
+        for i in range(len(mlp)-1):
+            self.mlp_bns.append(nn.BatchNorm1d(num_features=mlp[i+1]))
+
+        self.global_feature = global_feature
+
+        if self.global_feature:
+            self.mlp_convs.append(
+                nn.Linear(in_features=mlp[-1] * 2, out_features=num_to_sample, bias=False))
+        else:
+            self.mlp_convs.append(
+                nn.Linear(in_features=mlp[-1], out_features=num_to_sample, bias=False))
+
+        self.s = num_to_sample
+        self.n = max_local_num
+        self.temperature = 0.1
+        self.origin_point =  torch.nn.Parameter(torch.zeros(1,3), requires_grad=False)
+
+    def forward(self, coordinate: Tensor, feature: Tensor, train: bool = False) -> Tuple[Tensor, Tensor]:
+        """
+        Forward propagation of Point Structuring Net
+
+        Args:
+            coordinate: input points position data, [B, m, 3]
+            feature: input points feature, [B, m, d]
+        Returns:
+            sampled indices: the indices of sampled points, [B, s]
+            grouped_indices: the indices of grouped points, [B, s, n]
+        """
+        _, m, _ = coordinate.size()
+
+        assert self.s < m, "The number to sample must less than input points !"
+
+        r = torch.cdist(coordinate,self.origin_point,2).squeeze_()
+        th = torch.acos(coordinate[:,:,2] / r)
+        fi = torch.atan2(coordinate[:,:,1], coordinate[:,:,0])
+
+        coordinate2 = torch.cat([coordinate, th.unsqueeze_(2), fi.unsqueeze_(2)], -1)
+
+        x = coordinate2
+
+        # BatchNorm must be Channel First, while Linear is Channel Last, 
+        # Therefore transpose to Channel First for BatchNorm after MLP.
+        for i in range(len(self.mlp_convs) - 1):
+            x = F.relu(self.mlp_bns[i](self.mlp_convs[i](x).transpose(2,1))).transpose(2,1)
+
+        if self.global_feature:
+            max_feature = torch.max(x, 1, keepdim=True)[0]   #[B, 1, mlp[-1]]
+            max_feature = max_feature.repeat(1, m, 1)   # [B, m, mlp[-1]]
+            x = torch.cat([x, max_feature], 2)  # [B, m, mlp[-1] * 2]
+
+        x = self.mlp_convs[-1](x).transpose(1,2)   # [B,s,m]
+
+        Q = torch.sigmoid(x)  # [B, s, m]
+
+        _, grouped_indices = torch.topk(input=Q, k=self.n, dim=2)    # [B, s, n]
+        grouped_points = index_points(coordinate, grouped_indices)  #[B,s,n,3]
+        if feature is not None:
+            grouped_feature = index_points(feature, grouped_indices)  #[B,s,n,d]
+            if not train:
+                sampled_points = grouped_points[:,:,0,:]  # [B,s,3]
+                sampled_feature = grouped_feature[:,:,0,:]  #[B,s,d]
+            else:
+                # Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m] Using the Gumbel Softmax function included in PyTorch
+                sampled_points = torch.matmul(Q, coordinate)  # [B,s,3]
+                sampled_feature = torch.matmul(Q, feature)  # [B,s,d]
+                grouped_feature[:,:,0,:] = sampled_feature
+        else:
+            if not train:
+                sampled_points = grouped_points[:,:,0,:]  # [B,s,3]
+                sampled_feature = None  #[B,s,d]
+            else:
+                # Q = gumbel_softmax_sample(Q)  # [B, s, m]
+                Q = F.gumbel_softmax(Q, self.temperature, True) # [B, s, m]
+                sampled_points = torch.matmul(Q, coordinate)  # [B,s,3]
+                sampled_feature = None
+            grouped_feature = None
+
+        return sampled_points, grouped_points, sampled_feature, grouped_feature
+
 class PSNRadius(nn.Module):
     """
-    Point Sampling Net with heuristic condition PyTorch Module.
+    Point Structuring Net with heuristic condition PyTorch Module.
     This example is radius query
     You may replace function C(x) by your own function
 
@@ -130,7 +244,7 @@ class PSNRadius(nn.Module):
 
     def __init__(self, num_to_sample: int = 512, radius: float = 1.0, max_local_num: int = 32, mlp: List[int] = [32, 64, 256], global_feature: bool = False) -> None:
         """
-        Initialization of Point Sampling Net.
+        Initialization of Point Structuring Net.
         """
         super(PSNRadius, self).__init__()
 
@@ -167,7 +281,7 @@ class PSNRadius(nn.Module):
 
     def forward(self, coordinate: Tensor) -> Tuple[Tensor, Tensor]:
         """
-        Forward propagation of Point Sampling Net
+        Forward propagation of Point Structuring Net
 
         Args:
             coordinate: input points position data, [B, m, 3]
@@ -217,7 +331,7 @@ class PSNRadius(nn.Module):
 
 class PSNMSG(nn.Module):
     """
-    Point Sampling Net with Multi-scale Grouping PyTorch Module.
+    Point Structuring Net with Multi-scale Grouping PyTorch Module.
 
     Attributes:
         num_to_sample: the number to sample, int
@@ -228,7 +342,7 @@ class PSNMSG(nn.Module):
 
     def __init__(self, num_to_sample: int = 512, msg_n: List[int] = [32, 64], mlp: List[int] = [32, 64, 256], global_feature: bool = False) -> None:
         """
-        Initialization of Point Sampling Net.
+        Initialization of Point Structuring Net.
         """
         super(PSNMSG, self).__init__()
 
@@ -264,7 +378,7 @@ class PSNMSG(nn.Module):
 
     def forward(self, coordinate: Tensor, feature: Tensor, train: bool = False) -> Tuple[Tensor, Tensor]:
         """
-        Forward propagation of Point Sampling Net
+        Forward propagation of Point Structuring Net
 
         Args:
             coordinate: input points position data, [B, m, 3]
