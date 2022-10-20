@@ -58,27 +58,41 @@ sampled_points, grouped_points_msg, sampled_feature, grouped_feature_msg = psn_m
 *sampled_feature* is the sampled feature, *grouped_feature_msg* is the list of mutil-scale the grouped feature.
 
 
-# Visualize Effect
+# Visualizations
 ### Sampling
-![Visualize of Sampling](./image/plane1.png "Visualize of Sampling")
+![Visualization of Sampling](./image/plane1.png "Visualization of Sampling")
 ### Grouping
-![Visualize of Grouping](./image/plane2.png "Visualize of Grouping")
+![Visualization of Grouping](./image/plane2.png "Visualization of Grouping")
 
 # The Experiment on Deep Learning Networks
 There is an experiment on PointNet++
 ## Environments
 This experiment has been tested on follow environments:
-### Software
-Canonical Ubuntu 20.04.1 LTS / Microsoft Windows 10 Pro<br>
+
+### Environment 1
+#### Software
+Canonical Ubuntu 20.04.1 LTS<br>
 Python 3.8.5<br>
 PyTorch 1.7.0<br>
 NVIDIA® CUDA® Toolkit 10.2.89<br>
 NVIDIA® CUDA® Deep Neural Network library (cuDNN) 7.6.5<br>
 
-### Hardware
+#### Hardware
 Intel® Core™ i9-9900K Processor (16M Cache, up to 5.00 GHz)<br>
 64GB DDR4 RAM<br>
 NVIDIA® TITAN RTX™
+
+### Environment 2
+#### Software
+Microsoft Windows 11 Pro 22H2 22621.675<br>
+Python 3.10.6<br>
+PyTorch 1.14.0-nightly<br>
+NVIDIA® CUDA® Toolkit 11.7.1<br>
+
+#### Hardware
+AMD Ryzen™ 9 5950X Desktop Processors<br>
+32GB DDR4 3600 RAM<br>
+NVIDIA® GeForce RTX 3090
 
 ## Classification
 ### Data Preparation
